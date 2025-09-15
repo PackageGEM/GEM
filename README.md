@@ -102,7 +102,7 @@ During preprocessing, we derive the following variables:
 - Saliency variable — computed with the Itti–Koch–Niebur (2002) model; saliency maps are created from low‑level visual features, and values are averaged within each package region.
 - Package design variable — obtained from the package encoder. We apply rotated PCA with a custom criterion: each component in the embedding must explain at least 1% of the variance.
 
-### Run Run Eye Movement Model
+### Run Eye Movement Model
 > python ./Eye-Movement Model/Three-Layer Hierarchical Multinomial Probit.py
 
  
