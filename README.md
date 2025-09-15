@@ -70,7 +70,7 @@ LMDB_PATH
 ```
 
 
-### Training Decoder
+### Training Encoder
 ```
 python ./Encoder and Generator/Encoder/scripts/train.py \
 --dataset_type=ffhq_encode \
