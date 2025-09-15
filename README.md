@@ -1,110 +1,108 @@
-# StyleGAN 2 in PyTorch
+# Generative Deep Learning Framework with Guided Embedding Modifier (GEM): Improving Package Design Using Eye Movements
 
-Implementation of Analyzing and Improving the Image Quality of StyleGAN (https://arxiv.org/abs/1912.04958) in PyTorch
+> Package design plays a critical role at the point of purchase. Prior literature does not provide a comprehensive methodology that enables managers to design packages that are easy to find, while communicating their brand identity. This research addresses this gap by introducing a novel framework that integrates generative deep learning architectures with eye-movement data, which aims to make the following three contributions. First, it extends the standard generative deep learning framework by incorporating a Guided Embedding Modifier (GEM). This novel module allows the latent embedding space of existing package designs to be transformed in a guided manner, such that the transformation results in an improved package that is easier to find. Second, building on a two-stage eye-movement model of visual search, it successfully links package design embeddings to the eye movements of consumers. This model serves as input for the GEM component and generates counterfactual scanpaths to predict the performance of a newly generated package design. Third, to validate the performance of the approach, a follow-up online experiment confirms that consumers are able to find the newly designed packages faster than their original versions, demonstrating the practical relevance.
 
-## Notice
 
-I have tried to match official implementation as close as possible, but maybe there are some details I missed. So please use this implementation with care.
 
-## Requirements
+## Description   
+> Implementation of GEM framework for package design. Inspired on the pSp method and StyleGAN, we extend the framework with a Guided Embedding Modifier (GEM) that integrates eye‑movement data into the image-to-image translation process，enabling the redesign of packages that are easier for consumers to find.
 
-I have tested on:
+## Table of Contents
+  * [Description](#description)
+  * [Table of Contents](#table-of-contents)
+  * [Getting Started](#getting-started)
+    + [Prerequisites](#prerequisites)
+    + [Installation](#installation)
+    + [Pretrained Models](#pretrained-models)
+  * [Package Encoder and Generator](#package-encoder-andgenerator)
+    + [Preparing Data](#preparing-data)
+    + [Training Generator](#training-generator)
+    + [Training Encoder](#training-encoder)
+  * [Eye Movement Model](#eye-movement-model)
+    + [Eye Movement Data](#eye-movement-data)
+    + [Run Eye Movement Model](#run-eye-movement-model)
 
-- PyTorch 1.3.1
-- CUDA 10.1/10.2
 
-## Usage
+## Getting Started
+### Prerequisites
+- Linux or macOS
+- NVIDIA GPU + CUDA CuDNN (CPU may be possible with some modifications, but is not inherently supported)
+- Python 2 or 3
 
-First create lmdb datasets:
+### Installation
+- Clone this repo:
+``` 
+git clone https://github.com/PackageGEM/GEM.git
+cd GEM
+```
+- Dependencies:  
+We recommend running this repository using [Anaconda](https://docs.anaconda.com/anaconda/install/). 
+All dependencies for defining the environment are provided in `environment/GEM.yaml`.
+ 
 
-> python prepare_data.py --out LMDB_PATH --n_worker N_WORKER --size SIZE1,SIZE2,SIZE3,... DATASET_PATH
+### Pretrained Models
+Please download the pre-trained models from the following links.
+|[Encoder and Generator pre-trained models](https://drive.google.com/drive/folders/1lmRSSdJes-N-fGo5ZdKG35TP8HUA7pBs?usp=drive_link) 
 
-This will convert images to jpeg and pre-resizes it. This implementation does not use progressive growing, but you can create multiple resolution datasets using size arguments with comma separated lists, for the cases that you want to try another resolutions later.
+## Package Encoder and Generator
+### Preparing Data
+- Please see the shampoo dateset in the following link: https://drive.google.com/drive/folders/1ndpOzA9H-giD6Q6dzARJJgqj2AmegCMr?usp=drive_link
 
-Then you can train model in distributed settings
 
-> python -m torch.distributed.launch --nproc_per_node=N_GPU --master_port=PORT train.py --batch BATCH_SIZE LMDB_PATH
+### Training Generator
+Create LMDB datasets
+```
+python prepare_data.py \
+--out LMDB_PATH \
+--n_worker N_WORKER \
+--size SIZE1,SIZE2,SIZE3,... \
+DATASET_PATH
+```
 
-train.py supports Weights & Biases logging. If you want to use it, add --wandb arguments to the script.
+Train the generator (supports distributed training)
+```
+python -m torch.distributed.launch \
+--nproc_per_node=N_GPU \
+--master_port=PORT \
+./Encoder\ and\ Generator/Generator/train.py \
+--batch BATCH_SIZE \
+LMDB_PATH
+```
 
-#### SWAGAN
 
-This implementation experimentally supports SWAGAN: A Style-based Wavelet-driven Generative Model (https://arxiv.org/abs/2102.06108). You can train SWAGAN by using
+### Training Decoder
+```
+python ./Encoder and Generator/Encoder/scripts/train.py \
+--dataset_type=ffhq_encode \
+--exp_dir=/path/to/experiment \
+--checkpoint_path=/path/to/checkpoint\
+--workers=8 \
+--batch_size=2 \
+--test_batch_size=2 \
+--test_workers=8 \
+--val_interval=2500 \
+--save_interval=10000 \
+--encoder_type=GradualStyleEncoder \
+--start_from_latent_avg \
+--lpips_lambda=0.8 \
+--l2_lambda=1.5 \
+--id_lambda=0.1 \
+--output_size=256 \
+```
 
-> python -m torch.distributed.launch --nproc_per_node=N_GPU --master_port=PORT train.py --arch swagan --batch BATCH_SIZE LMDB_PATH
+## Eye Movement Model
+### Eye Movement Data
+Eyetracking data are avaliable in the ./Data/Eyetracking/.... For details on the data cleaning procedure, please refer to the main paper in the Data Processing section under Eye‑Tracking Study of Visual Search. The folllowing scripts map each fixation to the corresponding product and extract the corresponding behaviors in the search sequence.
+To preprocess the data, run:
+> python ./Data/Eyetracking/preprocessing/label.py
+> python ./Data/Eyetracking/preprocessing/behavior.py
 
-As noted in the paper, SWAGAN trains much faster. (About ~2x at 256px.)
+During preprocessing, we derive the following variables:
+- Similarity variable — computed as the cosine similarity between the embedding of the target package and the embeddings of each shelf package. The embeddings are generated using the trained encoder.
+- Saliency variable — computed with the Itti–Koch–Niebur (2002) model; saliency maps are created from low‑level visual features, and values are averaged within each package region.
+- Package design variable — obtained from the package encoder. We apply rotated PCA with a custom criterion: each component in the embedding must explain at least 1% of the variance.
 
-### Convert weight from official checkpoints
+### Run Run Eye Movement Model
+> python ./Eye-Movement Model/Three-Layer Hierarchical Multinomial Probit.py
 
-You need to clone official repositories, (https://github.com/NVlabs/stylegan2) as it is requires for load official checkpoints.
-
-For example, if you cloned repositories in ~/stylegan2 and downloaded stylegan2-ffhq-config-f.pkl, You can convert it like this:
-
-> python convert_weight.py --repo ~/stylegan2 stylegan2-ffhq-config-f.pkl
-
-This will create converted stylegan2-ffhq-config-f.pt file.
-
-### Generate samples
-
-> python generate.py --sample N_FACES --pics N_PICS --ckpt PATH_CHECKPOINT
-
-You should change your size (--size 256 for example) if you train with another dimension.
-
-### Project images to latent spaces
-
-> python projector.py --ckpt [CHECKPOINT] --size [GENERATOR_OUTPUT_SIZE] FILE1 FILE2 ...
-
-### Closed-Form Factorization (https://arxiv.org/abs/2007.06600)
-
-You can use `closed_form_factorization.py` and `apply_factor.py` to discover meaningful latent semantic factor or directions in unsupervised manner.
-
-First, you need to extract eigenvectors of weight matrices using `closed_form_factorization.py`
-
-> python closed_form_factorization.py [CHECKPOINT]
-
-This will create factor file that contains eigenvectors. (Default: factor.pt) And you can use `apply_factor.py` to test the meaning of extracted directions
-
-> python apply_factor.py -i [INDEX_OF_EIGENVECTOR] -d [DEGREE_OF_MOVE] -n [NUMBER_OF_SAMPLES] --ckpt [CHECKPOINT] [FACTOR_FILE]
-
-For example,
-
-> python apply_factor.py -i 19 -d 5 -n 10 --ckpt [CHECKPOINT] factor.pt
-
-Will generate 10 random samples, and samples generated from latents that moved along 19th eigenvector with size/degree +-5.
-
-![Sample of closed form factorization](factor_index-13_degree-5.0.png)
-
-## Pretrained Checkpoints
-
-[Link](https://drive.google.com/open?id=1PQutd-JboOCOZqmd95XWxWrO8gGEvRcO)
-
-I have trained the 256px model on FFHQ 550k iterations. I got FID about 4.5. Maybe data preprocessing, resolution, training loop could made this difference, but currently I don't know the exact reason of FID differences.
-
-## Samples
-
-![Sample with truncation](doc/sample.png)
-
-Sample from FFHQ. At 110,000 iterations. (trained on 3.52M images)
-
-![MetFaces sample with non-leaking augmentations](doc/sample-metfaces.png)
-
-Sample from MetFaces with Non-leaking augmentations. At 150,000 iterations. (trained on 4.8M images)
-
-### Samples from converted weights
-
-![Sample from FFHQ](doc/stylegan2-ffhq-config-f.png)
-
-Sample from FFHQ (1024px)
-
-![Sample from LSUN Church](doc/stylegan2-church-config-f.png)
-
-Sample from LSUN Church (256px)
-
-## License
-
-Model details and custom CUDA kernel codes are from official repostiories: https://github.com/NVlabs/stylegan2
-
-Codes for Learned Perceptual Image Patch Similarity, LPIPS came from https://github.com/richzhang/PerceptualSimilarity
-
-To match FID scores more closely to tensorflow official implementations, I have used FID Inception V3 implementations in https://github.com/mseitzer/pytorch-fid
+ 
